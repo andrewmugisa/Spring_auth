@@ -11,6 +11,7 @@ import org.wigo.auth.dto.LoginUserDto;
 import org.wigo.auth.dto.RegisterUserDto;
 import org.wigo.auth.dto.VerifyUserDto;
 import org.wigo.auth.model.AuthUser;
+import org.wigo.auth.model.AuthUserFactory;
 import org.wigo.auth.repository.AuthUserRepository;
 
 import java.time.Instant;
@@ -28,17 +29,20 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final AuthUserFactory userFactory;
 
     public AuthenticationService(
             AuthUserRepository userRepository,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
-            EmailService emailService
+            EmailService emailService,
+            AuthUserFactory userFactory
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.emailService = emailService;
+        this.userFactory = userFactory;
     }
 
     public AuthUser register(RegisterUserDto input) {
@@ -48,7 +52,7 @@ public class AuthenticationService {
 
         String username = generateUniqueUsername(input.getName());
 
-        AuthUser user = new AuthUser(
+        AuthUser user = userFactory.create(
                 username,
                 input.getEmail(),
                 passwordEncoder.encode(input.getPassword()),
