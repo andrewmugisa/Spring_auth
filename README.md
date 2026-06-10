@@ -1,422 +1,216 @@
----
+# spring-auth
 
-# Auth Layer — Manual Test Guide (Final)
+A reusable Spring Boot authentication library for Wigo projects.
 
----
-
-## 1. Signup — Happy Path
-
-**Endpoint:** `POST /auth/signup`
-
-**Request:**
-
-```json
-{
-  "email": "testEmail@test.com",
-  "password": "123456",
-  "name": "Test User"
-}
-```
-
-**Expected 200**
-
-```json
-{
-  "userId": 1,
-  "username": "testuser_4821",  // auto-generated display username
-  "name": "Test User",
-  "email": "testEmail@test.com",
-  "enabled": false,
-  "createdAt": "2026-05-10T00:00:00Z"
-}
-```
-
-✅ No `password`, `verificationCode`, `verificationCodeExpiration` in response
-✅ `username` is auto-generated
-✅ `enabled` is `false` until verification
+Drop it into any Spring Boot app and get a fully working auth system — JWT login, email verification, token blacklisting, and security config — without writing any of it again.
 
 ---
 
-## 2. Signup — Validation Errors
+## What this library gives you
 
-**Request:**
+When you add `spring-auth` as a dependency, your app automatically gets:
 
-```json
-{
-  "email": "not-an-email",
-  "password": "123",
-  "name": ""
-}
-```
+| Feature | Details |
+|---|---|
+| `POST /auth/signup` | Register with name, email, password. Sends verification email. |
+| `POST /auth/login` | Login by email + password. Returns JWT token. |
+| `POST /auth/verify` | Verify account with 6-digit code from email. |
+| `POST /auth/resend` | Resend verification code. |
+| `POST /auth/logout` | Blacklists the token server-side. |
+| JWT filter | Every request validated automatically. |
+| Security config | Stateless sessions, CORS, public/private routes. |
+| Global exception handler | Consistent error responses across all endpoints. |
+| Email service | HTML verification emails via SMTP. |
 
-**Expected 400**
-
-```json
-{
-  "timestamp": "...",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Validation failed",
-  "details": {
-    "email": "Invalid email format",
-    "password": "Password must be at least 6 characters",
-    "name": "Name is required"
-  }
-}
-```
+Your app only needs to own its **database**, its **User entity**, and any **app-specific business logic**.
 
 ---
 
-## 3. Signup — Duplicate Email
+## What you are responsible for (in your app)
 
-**Request:** *(same email as test 1)*
+The library is auth-only. Everything else stays in your app:
 
-```json
-{
-  "email": "testEmail@test.com",
-  "password": "123456",
-  "name": "Test Two"
-}
-```
-
-**Expected 400**
-
-```json
-{
-  "timestamp": "...",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Email is already registered"
-}
-```
+| Your app owns | Why |
+|---|---|
+| `UserEntity` | Extends `AuthUser` — you add your own fields here |
+| `UserRepository` | JPA repo — you own the database |
+| `AuthUserRepositoryAdapter` | 10-line bridge connecting your repo to the library |
+| `UserEntityFactory` | Tells the library how to create your `UserEntity` |
+| All other tables/entities | Events, bookings, products — none of that is touched |
+| `application.properties` | DB config, mail config, JWT secret — stays in your app |
 
 ---
 
-## 4. Signup — Name Collision
+## Database — important
 
-* Register two users with the same `name`.
-* Second signup should get a **unique auto-generated username**.
+This library does **not** create or manage a separate database.
 
-```json
-{ "email": "user1@gmail.com", "password": "123456", "name": "John Doe" }
+It uses **your app's database**. The `users` table lives in your app's DB alongside all your other tables (events, bookings, etc.). The library just needs a `UserEntity` that extends `AuthUser` — the base class provides the auth-related columns (`email`, `password`, `verification_code`, `enabled`, etc.).
+
+So if your app has:
 ```
-
-→ `username`: `johndoe`
-
-```json
-{ "email": "user2@gmail.com", "password": "123456", "name": "John Doe" }
+users         ← auth columns come from AuthUser base class
+events        ← your table
+bookings      ← your table
 ```
-
-→ `username`: `johndoe_XXXX`
-
-✅ Uniqueness handled server-side; no conflict errors
+Everything is in one database. You add tables freely — the library doesn't care.
 
 ---
 
-## 5. Login — Unverified Account
+## How to use in a new project
 
-**Request:**
+### Step 1 — Install the library
 
-```json
-{
-  "email": "testEmail@test.com",
-  "password": "123456"
-}
+```bash
+cd ~/IdeaProjects/Spring_auth
+./mvnw clean install
 ```
 
-**Expected 403**
+This installs it to your local Maven repo (`~/.m2`).
 
-```json
-{
-  "timestamp": "...",
-  "status": 403,
-  "error": "Forbidden",
-  "message": "Account not verified. Please check your email"
-}
+### Step 2 — Add the dependency
+
+In your app's `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.wigo</groupId>
+    <artifactId>spring-auth</artifactId>
+    <version>1.0.0</version>
+</dependency>
 ```
 
----
+Remove any deps your app no longer needs directly: `spring-boot-starter-security`, `spring-boot-starter-mail`, `jjwt-*`. They are pulled in transitively by the library.
 
-## 6–9. Verify Account
-
-### 6. Wrong Email
-
-```json
-{
-  "email": "wrong@gmail.com",
-  "verificationCode": "123456"
-}
-```
-
-**Expected 400**
-
-```json
-{
-  "timestamp": "...",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "User not found"
-}
-```
-
-### 7. Wrong Code
-
-```json
-{
-  "email": "testEmail@test.com",
-  "verificationCode": "000000"
-}
-```
-
-**Expected 400**
-
-```json
-{
-  "timestamp": "...",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Verification code does not match"
-}
-```
-
-### 8. Happy Path
-
-```json
-{
-  "email": "testEmail@test.com",
-  "verificationCode": "XXXXXX" // use actual code from email
-}
-```
-
-**Expected 200**
-
-```json
-{
-  "message": "Account verified successfully"
-}
-```
-
-### 9. Already Verified
-
-```json
-{
-  "email": "testEmail@test.com",
-  "verificationCode": "XXXXXX"
-}
-```
-
-**Expected 409**
-
-```json
-{
-  "timestamp": "...",
-  "status": 409,
-  "error": "Conflict",
-  "message": "Account is already verified"
-}
-```
-
----
-
-## 10–12. Resend Verification Code
-
-### 10. User Not Found
-
-```json
-{ "email": "nobody@gmail.com" }
-```
-
-**Expected 400**
-
-```json
-{
-  "timestamp": "...",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "User not found"
-}
-```
-
-### 11. Already Verified
-
-```json
-{ "email": "testEmail@test.com" }
-```
-
-**Expected 409**
-
-```json
-{
-  "timestamp": "...",
-  "status": 409,
-  "error": "Conflict",
-  "message": "Account is already verified"
-}
-```
-
-### 12. Happy Path
-
-* Sign up a fresh account (unverified)
-* Send:
-
-```json
-{ "email": "fresh@gmail.com" }
-```
-
-**Expected 200**
-
-```json
-{
-  "message": "Verification code resent successfully"
-}
-```
-
-✅ Old code invalidated
-
----
-
-## 13–14. Login
-
-### 13. Wrong Password
-
-```json
-{
-  "email": "testEmail@test.com",
-  "password": "wrongpassword"
-}
-```
-
-**Expected 401**
-
-```json
-{
-  "timestamp": "...",
-  "status": 401,
-  "error": "Unauthorized",
-  "message": "Invalid email or password"
-}
-```
-
-### 14. Happy Path
-
-```json
-{
-  "email": "testEmail@test.com",
-  "password": "123456"
-}
-```
-
-**Expected 200**
-
-```json
-{
-  "token": "eyJ...",
-  "expiresIn": 3600000
-}
-```
-
-✅ Save token for authenticated endpoints
-
----
-
-## 15–17. Get Current User
-
-**Endpoint:** `GET /users/me`
-**Header:** `Authorization: Bearer <token>`
-
-* **15. Valid token → 200**
-* **16. No token → 401**
-* **17. Invalid token → 401**
-
-✅ Response excludes sensitive fields
-
----
-
-## 18–20. Update Username
-
-**Endpoint:** `PATCH /users/me/username`
-**Header:** `Authorization: Bearer <token>`
-
-### 18. Happy Path
-
-```json
-{ "username": "mynewusername" }
-```
-
-**Expected 200**
-
-```json
-{
-  "userId": 1,
-  "username": "mynewusername",
-  "name": "Test User",
-  "email": "testEmail@test.com",
-  "enabled": true,
-  "createdAt": "2026-05-10T00:00:00Z"
-}
-```
-
-### 19. Username Taken
-
-```json
-{ "username": "mynewusername" }
-```
-
-**Expected 400**
-
-```json
-{
-  "timestamp": "...",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Username is already taken"
-}
-```
-
-### 20. No Token → 401
-
----
-
-## 21. Expired Verification Code
-
-* Temporarily set expiry to 1 minute for testing:
+### Step 3 — Create your UserEntity
 
 ```java
-private static final int VERIFICATION_EXPIRY_MINUTES = 1;
-```
+@Entity
+@Table(name = "users")
+public class UserEntity extends AuthUser {
 
-* Sign up → wait → verify
+    // Add your app-specific fields here
+    // e.g. private String profilePicture;
+    // e.g. @OneToMany private List<Event> events;
 
-**Expected 409**
+    public UserEntity(String username, String email, String password, String name) {
+        super(username, email, password, name);
+    }
 
-```json
-{
-  "timestamp": "...",
-  "status": 409,
-  "error": "Conflict",
-  "message": "Verification code has expired. Please request a new one"
+    public UserEntity() { super(); }
 }
 ```
 
+### Step 4 — Add the two adapter classes
+
+**`AuthUserRepositoryAdapter.java`** — bridges your JPA repo to the library:
+
+```java
+@Repository
+public class AuthUserRepositoryAdapter implements AuthUserRepository {
+
+    private final UserRepository userRepository;
+
+    public AuthUserRepositoryAdapter(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override public Optional<UserDetails> findByEmail(String email) {
+        return userRepository.findByEmail(email).map(u -> (UserDetails) u);
+    }
+    @Override public Optional<UserDetails> findByUsername(String username) {
+        return userRepository.findByUsername(username).map(u -> (UserDetails) u);
+    }
+    @Override public Optional<UserDetails> findByVerificationCode(String code) {
+        return userRepository.findByVerificationCode(code).map(u -> (UserDetails) u);
+    }
+    @Override public UserDetails save(UserDetails user) {
+        return userRepository.save((UserEntity) user);
+    }
+}
+```
+
+**`UserEntityFactory.java`** — tells the library how to instantiate your entity:
+
+```java
+@Component
+public class UserEntityFactory implements AuthUserFactory {
+    @Override
+    public AuthUser create(String username, String email, String password, String name) {
+        return new UserEntity(username, email, password, name);
+    }
+}
+```
+
+### Step 5 — Add required properties
+
+In your `application.properties` or `.env`:
+
+```properties
+# JWT
+security.jwt.secret-key=your-base64-secret
+security.jwt.expiration-time=3600000
+
+# Mail (SMTP)
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=your-email@gmail.com
+spring.mail.password=your-app-password
+spring.mail.properties.mail.smtp.starttls.enable=true
+
+# CORS
+server.localhost-url=http://127.0.0.1:5500
+server.local-test-url=http://localhost:3000
+```
+
+That's it. Start your app — all `/auth/**` endpoints are live.
+
 ---
 
-### ✅ Pass Criteria Summary
+## Updating the library
 
-| #  | Endpoint          | Scenario                 | Status |
-| -- | ----------------- | ------------------------ | ------ |
-| 1  | POST /auth/signup | Happy path               | 200    |
-| 2  | POST /auth/signup | Validation errors        | 400    |
-| 3  | POST /auth/signup | Duplicate email          | 400    |
-| 4  | POST /auth/signup | Duplicate name collision | 200    |
-| 5  | POST /auth/login  | Unverified account       | 403    |
-| 6  | POST /auth/verify | Wrong email              | 400    |
-| 7  | POST /auth/verify | Wrong code               | 400    |
-| 8  | POST /auth/verify | Happy path               | 200    |
-| 9  | POST /auth/verify | Already verified         | 409    |
-| 10 | POST /auth/resend | User not found           | 400    |
-| 11 | POST /auth/resend | Already verified         | 409    |
-| 12 | POST /auth/resend | Happy path               | 200    |
-| 13 | POST /auth/login  | Wrong password           | 401    |
-| 14 | POST /auth/login  | Happy path               | 200    |
-| 15 | GET /users/me     | Valid token              | 200    |
-| 16 | GET /users/me     |                          |        |
+When you fix or improve authentication in `Spring_auth`:
+
+```bash
+# 1. Make your changes in Spring_auth
+# 2. Bump the version in Spring_auth pom.xml (e.g. 1.0.0 → 1.0.1)
+cd ~/IdeaProjects/Spring_auth
+./mvnw clean install
+
+# 3. Update the version in your app's pom.xml
+# 4. Rebuild your app
+cd ~/IdeaProjects/wigo_events
+./mvnw clean compile
+```
+
+Every project that depends on `spring-auth` gets the fix by bumping one version number.
+
+---
+
+## Project structure reference
+
+```
+spring-auth/
+└── src/main/java/org/wigo/auth/
+    ├── WigoAuthAutoConfiguration.java   ← Spring Boot auto-wires everything
+    ├── config/
+    │   ├── SecurityConfiguration.java   ← JWT filter chain, CORS, public routes
+    │   ├── ApplicationConfiguration.java← UserDetailsService, BCrypt, AuthManager
+    │   ├── JwtAuthenticationFilter.java ← validates Bearer token on every request
+    │   ├── EmailConfiguration.java      ← JavaMailSender setup
+    │   └── GlobalExceptionHandler.java  ← consistent error response format
+    ├── controller/
+    │   └── AuthController.java          ← /auth/* endpoints
+    ├── service/
+    │   ├── AuthenticationService.java   ← register, login, verify, resend logic
+    │   ├── JwtService.java              ← token generation and validation
+    │   ├── EmailService.java            ← sends HTML emails
+    │   └── TokenBlacklistService.java   ← logout / token revocation
+    ├── model/
+    │   ├── AuthUser.java                ← abstract base entity (extend this)
+    │   └── AuthUserFactory.java         ← interface your app implements
+    ├── repository/
+    │   └── AuthUserRepository.java      ← interface your app implements
+    ├── dto/                             ← RegisterUserDto, LoginUserDto, etc.
+    └── response/                        ← LoginResponse, ApiResponse
+```
