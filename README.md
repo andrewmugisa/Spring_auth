@@ -82,7 +82,26 @@ In your app's `pom.xml`:
 
 Remove any deps your app no longer needs directly: `spring-boot-starter-security`, `spring-boot-starter-mail`, `jjwt-*`. They are pulled in transitively by the library.
 
-### Step 3 — Create your UserEntity
+### Step 3 — Exclude Spring Boot's default security auto-config
+
+In your app's main class:
+
+```java
+@SpringBootApplication(excludeName = {
+        "org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration"
+})
+public class YourApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(YourApplication.class, args);
+    }
+}
+```
+
+> This is required. Spring Boot 4 registers its own default security filter chain which conflicts with the library's. The `excludeName` approach uses strings so it compiles regardless of Spring Boot 4's package reorganisation.
+
+### Step 4 — Create your UserEntity
 
 ```java
 @Entity
@@ -101,7 +120,7 @@ public class UserEntity extends AuthUser {
 }
 ```
 
-### Step 4 — Add the two adapter classes
+### Step 5 — Add the two adapter classes
 
 **`AuthUserRepositoryAdapter.java`** — bridges your JPA repo to the library:
 
@@ -142,7 +161,7 @@ public class UserEntityFactory implements AuthUserFactory {
 }
 ```
 
-### Step 5 — Add required properties
+### Step 6 — Add required properties
 
 In your `application.properties` or `.env`:
 
@@ -187,6 +206,12 @@ Every project that depends on `spring-auth` gets the fix by bumping one version 
 
 ---
 
+## Multi-device login behaviour
+
+This library uses **stateless JWT**. The server does not track active sessions, so logging in on multiple devices or browsers issues independent tokens — all valid simultaneously until they expire. This is intentional. If you need single-session enforcement (invalidate old tokens on new login), that requires a `sessions` table and is outside the scope of this library.
+
+---
+
 ## Project structure reference
 
 ```
@@ -197,14 +222,13 @@ spring-auth/
     │   ├── SecurityConfiguration.java   ← JWT filter chain, CORS, public routes
     │   ├── ApplicationConfiguration.java← UserDetailsService, BCrypt, AuthManager
     │   ├── JwtAuthenticationFilter.java ← validates Bearer token on every request
-    │   ├── EmailConfiguration.java      ← JavaMailSender setup
     │   └── GlobalExceptionHandler.java  ← consistent error response format
     ├── controller/
     │   └── AuthController.java          ← /auth/* endpoints
     ├── service/
     │   ├── AuthenticationService.java   ← register, login, verify, resend logic
     │   ├── JwtService.java              ← token generation and validation
-    │   ├── EmailService.java            ← sends HTML emails
+    │   ├── EmailService.java            ← sends HTML emails via Spring Mail auto-config
     │   └── TokenBlacklistService.java   ← logout / token revocation
     ├── model/
     │   ├── AuthUser.java                ← abstract base entity (extend this)
