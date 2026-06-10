@@ -1,0 +1,256 @@
+
+/* Variables for easy theme management */
+:root {
+  --primary-color: #0a5dec;
+  --secondary-color: #031c49;
+  --accent-color: #0546fa;
+  --bg-dark: #000000;
+  --bg-light: #e9e5e5;
+  --text-color: #ffffff;
+  --border-radius: 8px;
+  --transition-speed: 0.3s;
+}
+
+/* Global Styles */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: "Arial", sans-serif;
+  color: var(--text-color);
+  background: linear-gradient(
+    135deg,
+    var(--secondary-color),
+    #000022,
+    var(--secondary-color)
+  );
+  /* display: flex;
+  justify-content: center;
+  align-items: center; */
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center; /* centers everything horizontally */
+  height: 100vh;
+}
+
+/* Header Styling */
+#header h1 {
+  font-family: "Georgia", serif;
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 2rem;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7);
+}
+
+/* Section Title */
+#sectionTitle {
+  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Login Form - Glassmorphism Effect */
+#loginForm {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 2.5rem;
+  max-width: 400px;
+  width: 100%;
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  transition:
+    transform var(--transition-speed),
+    box-shadow var(--transition-speed);
+}
+
+#loginForm:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* Input Fields */
+#loginForm input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  transition:
+    border-color var(--transition-speed),
+    background var(--transition-speed);
+}
+
+#loginForm input:focus {
+  border-color: var(--primary-color);
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+}
+
+/* Labels */
+label {
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+
+/* Buttons */
+button {
+  background: transparent;
+  color: var(--text-color);
+  padding: 10px 20px;
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+
+button:hover {
+  background: var(--primary-color);
+  color: var(--bg-dark);
+  transform: scale(1.05);
+}
+
+/* Buttons Container */
+#buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  gap: 10px;
+}
+
+/* Forgot Password Link */
+#forgotPassword a {
+  color: var(--accent-color);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color var(--transition-speed);
+}
+
+#forgotPassword a:hover {
+  color: var(--primary-color);
+}
+
+/* Responsive Design */
+@media screen and (max-width: 500px) {
+  #loginForm {
+    padding: 2rem;
+  }
+
+  #sectionTitle {
+    font-size: 2rem;
+  }
+}
+
+/* ==============================
+   Signup Form Styling
+   ============================== */
+
+#signupContent {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+}
+
+#signupForm {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 2.5rem;
+  max-width: 400px;
+  width: 100%;
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  transition:
+    transform var(--transition-speed),
+    box-shadow var(--transition-speed);
+}
+
+#signupForm:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7);
+}
+
+#signupForm input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  transition:
+    border-color var(--transition-speed),
+    background var(--transition-speed);
+}
+
+#signupForm input:focus {
+  border-color: var(--primary-color);
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+}
+
+label {
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+
+/* Buttons Styling – same as login page */
+#signupForm button {
+  background: transparent;
+  color: var(--text-color);
+  padding: 10px 20px;
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+
+#signupForm button:hover {
+  background: var(--primary-color);
+  color: var(--bg-dark);
+  transform: scale(1.05);
+}
+
+#buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  gap: 10px;
+}
+
+/* Gradient Section Title */
+#signupForm #sectionTitle {
+  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 500px) {
+  #signupForm {
+    padding: 2rem;
+  }
+
+  #signupForm #sectionTitle {
+    font-size: 2rem;
+  }
+}
+
