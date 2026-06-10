@@ -1,6 +1,7 @@
 package org.wigo.auth.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -14,7 +15,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 import jakarta.servlet.http.HttpServletResponse;
+import org.wigo.auth.service.JwtService;
+import org.wigo.auth.service.TokenBlacklistService;
+import org.springframework.security.core.userdetails.UserDetailsService;
 
 import java.util.List;
 
@@ -23,7 +28,6 @@ import java.util.List;
 public class SecurityConfiguration {
 
     private final AuthenticationProvider authenticationProvider;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Value("${server.localhost-url}")
     private String localHostURL;
@@ -31,35 +35,50 @@ public class SecurityConfiguration {
     @Value("${server.local-test-url}")
     private String localTestURL;
 
-    public SecurityConfiguration(
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            AuthenticationProvider authenticationProvider
-    ) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    public SecurityConfiguration(AuthenticationProvider authenticationProvider) {
         this.authenticationProvider = authenticationProvider;
     }
 
     @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter(
+            JwtService jwtService,
+            UserDetailsService userDetailsService,
+            HandlerExceptionResolver handlerExceptionResolver,
+            TokenBlacklistService tokenBlacklistService
+    ) {
+        return new JwtAuthenticationFilter(jwtService, userDetailsService, handlerExceptionResolver, tokenBlacklistService);
+    }
+
+    // Prevent Spring Boot from auto-registering this filter outside the security chain
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<FilterRegistrationBean> registration = new FilterRegistrationBean();
+        registration.setFilter(filter);
+        registration.setEnabled(false);
+        return (FilterRegistrationBean<JwtAuthenticationFilter>) (FilterRegistrationBean<?>) registration;
+    }
+
+    @Bean
     @Order(1)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling(ex -> ex
-                        .accessDeniedHandler((request, response, e) ->
-                                response.sendError(HttpServletResponse.SC_FORBIDDEN, e.getMessage()))
-                        .authenticationEntryPoint((request, response, e) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage()))
-                );
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider)
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .exceptionHandling(ex -> ex
+                .accessDeniedHandler((request, response, e) ->
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN, e.getMessage()))
+                .authenticationEntryPoint((request, response, e) ->
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage()))
+            );
         return http.build();
     }
 
@@ -70,7 +89,6 @@ public class SecurityConfiguration {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
