@@ -10,6 +10,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -19,7 +20,6 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import jakarta.servlet.http.HttpServletResponse;
 import org.wigo.auth.service.JwtService;
 import org.wigo.auth.service.TokenBlacklistService;
-import org.springframework.security.core.userdetails.UserDetailsService;
 
 import java.util.List;
 
@@ -49,13 +49,12 @@ public class SecurityConfiguration {
         return new JwtAuthenticationFilter(jwtService, userDetailsService, handlerExceptionResolver, tokenBlacklistService);
     }
 
-    // Prevent Spring Boot from auto-registering this filter outside the security chain
+    // Prevent Spring Boot from auto-registering the filter outside the security chain
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
-        FilterRegistrationBean<FilterRegistrationBean> registration = new FilterRegistrationBean();
-        registration.setFilter(filter);
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
-        return (FilterRegistrationBean<JwtAuthenticationFilter>) (FilterRegistrationBean<?>) registration;
+        return registration;
     }
 
     @Bean
